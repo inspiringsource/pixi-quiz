@@ -1,0 +1,229 @@
+// main.js
+import { Application, Text, TextStyle, Container, Graphics } from "pixi.js";
+
+/* --- Einfache Java-Fragen (Deutsch) --- */
+const questions = [
+  { q: "Wofür steht JVM?", opts: ["Java Virtual Machine","Java Version Manager","Java Vendor Module","Just Virtual Mode"], ans: 0 },
+  { q: "Welches Schlüsselwort zeigt Vererbung an?", opts: ["with","extends","inherits","include"], ans: 1 },
+  { q: "Welcher Datentyp speichert ganze Zahlen?", opts: ["float","int","boolean","char"], ans: 1 },
+  { q: "Welche Sammlung ist geordnet und erlaubt Duplikate?", opts: ["Set","List","Map","Enum"], ans: 1 },
+  { q: "Welche Sichtbarkeit erlaubt Zugriff aus überall?", opts: ["private","protected","package-private","public"], ans: 3 },
+  { q: "Standardwert eines int-Felds (nicht initialisiert)?", opts: ["null","0","NaN","undefined"], ans: 1 },
+  { q: "Welches Schlüsselwort verbietet Überschreiben einer Methode?", opts: ["abstract","final","static","default"], ans: 1 },
+  { q: "Welche Schnittstelle wird typischerweise zum Sortieren benutzt?", opts: ["Cloneable","Serializable","Comparable","Runnable"], ans: 2 }
+];
+
+let idx = 0, score = 0, finished = false;
+
+const app = new Application();
+await app.init({ background: "#0f141a", resizeTo: window, antialias: true });
+document.body.appendChild(app.canvas);
+
+/* --- Styles --- */
+const titleStyle = new TextStyle({ fill: "#fff", fontFamily: "ui-sans-serif, system-ui", fontSize: 28, fontWeight: "700" });
+const qStyle     = new TextStyle({ fill: "#e8f0fe", fontFamily: "ui-sans-serif, system-ui", fontSize: 22, wordWrap: true, wordWrapWidth: 800 });
+const btnStyle   = new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 18, fontWeight: "600" });
+const smallStyle = new TextStyle({ fill: "#b9c0cb", fontFamily: "ui-sans-serif, system-ui", fontSize: 14 });
+const resultStyle= new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 18, fontWeight: "600" });
+const resultBig  = new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 22, fontWeight: "700" });
+
+/* --- Layers --- */
+const root = new Container();      app.stage.addChild(root);
+const effects = new Container();   app.stage.addChild(effects);  // confetti layer
+const overlay = new Container();   app.stage.addChild(overlay);  // results screen (hidden until done)
+overlay.visible = false;
+
+/* --- Title / Question / Status --- */
+const title = new Text({ text: "Java Quiz", style: titleStyle }); root.addChild(title);
+const questionText = new Text({ text: "", style: qStyle });       root.addChild(questionText);
+const scoreText = new Text({ text: "Punkte: 0", style: smallStyle });
+const progressText = new Text({ text: "Frage 1 / 8", style: smallStyle });
+root.addChild(scoreText, progressText);
+
+/* --- Buttons (A–D) --- */
+const buttons = [];
+for (let i = 0; i < 4; i++) {
+  const btn = makeButton((btnRef) => onPick(i, btnRef));
+  buttons.push(btn);
+  root.addChild(btn);
+}
+
+/* --- Results screen --- */
+const resultCard = new Graphics();
+const resultTitle = new Text({ text: "Ergebnis", style: resultBig });
+const resultStats = new Text({ text: "", style: resultStyle });
+const restartBtn  = makeButton(() => restart());
+overlay.addChild(resultCard, resultTitle, resultStats, restartBtn);
+
+/* --- Layout --- */
+const layout = () => {
+  const pad = 16;
+  const w = app.renderer.width;
+  const h = app.renderer.height;
+  const maxW = Math.min(720, w - pad * 2);
+
+  // Main view
+  title.x = pad; title.y = pad;
+
+  questionText.style.wordWrapWidth = maxW;
+  questionText.x = pad; questionText.y = title.y + title.height + 10;
+
+  const btnW = maxW, btnH = 56, gap = 10;
+  for (let i = 0; i < buttons.length; i++) {
+    const b = buttons[i];
+    b.position.set(pad, questionText.y + questionText.height + 16 + i * (btnH + gap));
+    b.resize(btnW, btnH);
+  }
+  const lastBtn = buttons[buttons.length - 1];
+  scoreText.x = pad; scoreText.y = lastBtn.y + btnH + 14;
+  progressText.y = scoreText.y; progressText.x = pad + maxW - progressText.width;
+
+  // Results overlay (centered card)
+  const cardW = Math.min(520, w - 2 * pad);
+  const cardH = 220;
+  resultCard.clear();
+  resultCard.roundRect(0, 0, cardW, cardH, 16).fill(0xffffff).stroke({ width:1, color:0xd9dde5 });
+
+  resultCard.x = (w - cardW) / 2;
+  resultCard.y = Math.max((h - cardH) / 2, 40);
+
+  resultTitle.x = resultCard.x + 16;
+  resultTitle.y = resultCard.y + 14;
+
+  resultStats.x = resultCard.x + 16;
+  resultStats.y = resultTitle.y + resultTitle.height + 8;
+
+  restartBtn.position.set(resultCard.x + 16, resultCard.y + cardH - 16 - 48);
+  restartBtn.resize(cardW - 32, 48);
+};
+window.addEventListener("resize", layout);
+
+/* --- State/UI --- */
+function setUI() {
+  if (idx >= questions.length) {
+    finished = true;
+    buttons.forEach(b => b.setEnabled(false));
+    scoreText.text = `Punkte: ${score}`;
+    progressText.text = "Fertig";
+
+    // Show results overlay
+    const total = questions.length;
+    const wrong = total - score;
+    resultStats.text = `Richtig: ${score}   |   Falsch: ${wrong}   |   Gesamt: ${total}`;
+    overlay.visible = true;
+    layout();
+    return;
+  }
+  const q = questions[idx];
+  questionText.text = q.q;
+  for (let i = 0; i < buttons.length; i++) {
+    const label = `${String.fromCharCode(65 + i)}) ${q.opts[i]}`;
+    buttons[i].setLabel(label);
+  }
+  scoreText.text = `Punkte: ${score}`;
+  progressText.text = `Frage ${idx + 1} / ${questions.length}`;
+  overlay.visible = false;
+  layout();
+}
+
+function onPick(i, btnRef) {
+  if (finished) return;
+  const correct = questions[idx].ans === i;
+  if (correct) {
+    score++;
+    const b = btnRef.getBounds();
+    confettiBurst(b.x + b.width / 2, b.y + b.height / 2);
+    btnRef.flash("#22c55e"); // green flash
+  } else {
+    btnRef.flash("#ef4444"); // red flash
+  }
+  idx++;
+  setUI();
+}
+
+function restart() {
+  idx = 0;
+  score = 0;
+  finished = false;
+  buttons.forEach(b => b.setEnabled(true));
+  overlay.visible = false;
+  setUI();
+}
+
+function updateQuestion() { setUI(); }
+updateQuestion();
+
+/* ------------------------------------------------------------------ */
+/*                           Confetti effect                           */
+/* ------------------------------------------------------------------ */
+const rng = (a, b) => a + Math.random() * (b - a);
+const COLORS = [0xff7aa2, 0x7dd3fc, 0x34d399, 0xf59e0b, 0x93c5fd, 0xfda4af, 0xf472b6, 0xa78bfa];
+const particles = new Set();
+
+function confettiBurst(x, y, count = 80) {
+  for (let i = 0; i < count; i++) {
+    const g = new Graphics();
+    const w = rng(4, 8), h = rng(6, 12);
+    g.rect(-w / 2, -h / 2, w, h);
+    g.fill(COLORS[(Math.random() * COLORS.length) | 0]);
+    g.x = x; g.y = y;
+    g.rotation = rng(0, Math.PI * 2);
+    g.vx = Math.cos(rng(0, Math.PI * 2)) * rng(2, 6);
+    g.vy = Math.sin(rng(0, Math.PI * 2)) * rng(2, 6) - rng(2, 5);
+    g.omega = rng(-0.2, 0.2);
+    g.life = rng(45, 70);
+    g.alpha = 1;
+    effects.addChild(g);
+    particles.add(g);
+  }
+}
+
+app.ticker.add(() => {
+  if (!particles.size) return;
+  for (const p of particles) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;     // gravity
+    p.rotation += p.omega;
+    p.life -= 1;
+    if (p.life < 20) p.alpha = Math.max(0, p.life / 20);
+    if (p.life <= 0) { particles.delete(p); p.destroy(); }
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/*                        Minimal button component                      */
+/* ------------------------------------------------------------------ */
+function makeButton(onClick) {
+  const bg = new Graphics();
+  const t = new Text({ text: "Option", style: btnStyle });
+  const hit = new Graphics();
+  const c = new Container();
+  c.addChild(bg, t, hit);
+
+  let w = 300, h = 56, enabled = true;
+
+  const draw = (fill = 0xffffff, stroke = 0xd9dde5) => {
+    bg.clear();
+    bg.roundRect(0, 0, w, h, 12).fill(fill).stroke({ width: 1, color: stroke });
+    t.x = 14; t.y = (h - t.height) / 2;
+    hit.clear(); hit.rect(0, 0, w, h).fill(0xffffff, 0.0001);
+  };
+
+  c.eventMode = "static";
+  c.cursor = "pointer";
+  c.on("pointertap", () => { if (enabled) onClick(c); });
+  c.on("pointerover", () => { if (!enabled) return; bg.tint = 0xf2f4f8; });
+  c.on("pointerout",  () => { bg.tint = 0xffffff; });
+
+  c.resize = (nw, nh) => { w = nw; h = nh; draw(); };
+  c.setLabel = (s) => { t.text = s; draw(); };
+  c.setEnabled = (e) => { enabled = e; c.alpha = e ? 1.0 : 0.5; c.eventMode = e ? "static" : "none"; };
+  c.flash = (hex) => {
+    draw(parseInt(hex.replace("#",""), 16));
+    setTimeout(() => draw(), 150);
+  };
+
+  draw();
+  return c;
+}
