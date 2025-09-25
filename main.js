@@ -20,17 +20,17 @@ await app.init({ background: "#0f141a", resizeTo: window, antialias: true });
 document.body.appendChild(app.canvas);
 
 /* --- Styles --- */
-const titleStyle = new TextStyle({ fill: "#fff", fontFamily: "ui-sans-serif, system-ui", fontSize: 28, fontWeight: "700" });
-const qStyle     = new TextStyle({ fill: "#e8f0fe", fontFamily: "ui-sans-serif, system-ui", fontSize: 22, wordWrap: true, wordWrapWidth: 800 });
-const btnStyle   = new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 18, fontWeight: "600" });
-const smallStyle = new TextStyle({ fill: "#b9c0cb", fontFamily: "ui-sans-serif, system-ui", fontSize: 14 });
-const resultStyle= new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 18, fontWeight: "600" });
-const resultBig  = new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 22, fontWeight: "700" });
+const titleStyle  = new TextStyle({ fill: "#fff",    fontFamily: "ui-sans-serif, system-ui", fontSize: 28, fontWeight: "700" });
+const qStyle      = new TextStyle({ fill: "#e8f0fe", fontFamily: "ui-sans-serif, system-ui", fontSize: 22, wordWrap: true, wordWrapWidth: 800 });
+const btnText     = new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 18, fontWeight: "600" });
+const smallStyle  = new TextStyle({ fill: "#b9c0cb", fontFamily: "ui-sans-serif, system-ui", fontSize: 14 });
+const resultStyle = new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 18, fontWeight: "600" });
+const resultBig   = new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 22, fontWeight: "700" });
 
 /* --- Layers --- */
 const root = new Container();      app.stage.addChild(root);
 const effects = new Container();   app.stage.addChild(effects);  // confetti layer
-const overlay = new Container();   app.stage.addChild(overlay);  // results screen (hidden until done)
+const overlay = new Container();   app.stage.addChild(overlay);  // results screen
 overlay.visible = false;
 
 /* --- Title / Question / Status --- */
@@ -49,10 +49,12 @@ for (let i = 0; i < 4; i++) {
 }
 
 /* --- Results screen --- */
-const resultCard = new Graphics();
+const resultCard  = new Graphics();
 const resultTitle = new Text({ text: "Ergebnis", style: resultBig });
 const resultStats = new Text({ text: "", style: resultStyle });
 const restartBtn  = makeButton(() => restart());
+restartBtn.setLabel("Restart");
+
 overlay.addChild(resultCard, resultTitle, resultStats, restartBtn);
 
 /* --- Layout --- */
@@ -78,12 +80,11 @@ const layout = () => {
   scoreText.x = pad; scoreText.y = lastBtn.y + btnH + 14;
   progressText.y = scoreText.y; progressText.x = pad + maxW - progressText.width;
 
-  // Results overlay (centered card)
+  // Results overlay (center)
   const cardW = Math.min(520, w - 2 * pad);
   const cardH = 220;
   resultCard.clear();
   resultCard.roundRect(0, 0, cardW, cardH, 16).fill(0xffffff).stroke({ width:1, color:0xd9dde5 });
-
   resultCard.x = (w - cardW) / 2;
   resultCard.y = Math.max((h - cardH) / 2, 40);
 
@@ -105,8 +106,7 @@ function setUI() {
     buttons.forEach(b => b.setEnabled(false));
     scoreText.text = `Punkte: ${score}`;
     progressText.text = "Fertig";
-
-    // Show results overlay
+    // Results
     const total = questions.length;
     const wrong = total - score;
     resultStats.text = `Richtig: ${score}   |   Falsch: ${wrong}   |   Gesamt: ${total}`;
@@ -119,6 +119,7 @@ function setUI() {
   for (let i = 0; i < buttons.length; i++) {
     const label = `${String.fromCharCode(65 + i)}) ${q.opts[i]}`;
     buttons[i].setLabel(label);
+    buttons[i].setFill(0xffffff); // reset to white each question
   }
   scoreText.text = `Punkte: ${score}`;
   progressText.text = `Frage ${idx + 1} / ${questions.length}`;
@@ -129,29 +130,33 @@ function setUI() {
 function onPick(i, btnRef) {
   if (finished) return;
   const correct = questions[idx].ans === i;
+
   if (correct) {
     score++;
+    // button = green + confetti
+    btnRef.setFill(0x22c55e);
     const b = btnRef.getBounds();
     confettiBurst(b.x + b.width / 2, b.y + b.height / 2);
-    btnRef.flash("#22c55e"); // green flash
   } else {
-    btnRef.flash("#ef4444"); // red flash
+    // button = red + shake + score flash red
+    btnRef.setFill(0xef4444);
+    shake(btnRef, 350);            // 350ms shake
+    flashText(scoreText, "#ef4444", 220);
   }
+
   idx++;
-  setUI();
+  // Slight delay so player sees the color/animation (esp. shake) before next question
+  setTimeout(setUI, correct ? 150 : 360);
 }
 
 function restart() {
-  idx = 0;
-  score = 0;
-  finished = false;
+  idx = 0; score = 0; finished = false;
   buttons.forEach(b => b.setEnabled(true));
   overlay.visible = false;
   setUI();
 }
 
-function updateQuestion() { setUI(); }
-updateQuestion();
+setUI();
 
 /* ------------------------------------------------------------------ */
 /*                           Confetti effect                           */
@@ -192,18 +197,50 @@ app.ticker.add(() => {
 });
 
 /* ------------------------------------------------------------------ */
+/*                         Tiny tween utilities                        */
+/* ------------------------------------------------------------------ */
+function shake(container, durationMs = 350, amplitude = 7, freq = 32) {
+  const start = performance.now();
+  const baseX = container.x, baseY = container.y;
+  let done = false;
+
+  const step = () => {
+    if (done) return;
+    const t = performance.now() - start;
+    const p = Math.min(1, t / durationMs);
+    const angle = (t / 1000) * freq * Math.PI * 2;
+    const damp = 1 - p; // ease out
+    container.x = baseX + Math.sin(angle) * amplitude * damp;
+    container.y = baseY + Math.cos(angle * 0.9) * (amplitude * 0.5) * damp;
+    if (p >= 1) {
+      container.x = baseX; container.y = baseY;
+      done = true;
+    } else {
+      requestAnimationFrame(step);
+    }
+  };
+  requestAnimationFrame(step);
+}
+
+function flashText(textObj, hex, ms = 200) {
+  const prev = textObj.style.fill;
+  textObj.style.fill = hex;
+  setTimeout(() => { textObj.style.fill = prev; }, ms);
+}
+
+/* ------------------------------------------------------------------ */
 /*                        Minimal button component                      */
 /* ------------------------------------------------------------------ */
 function makeButton(onClick) {
   const bg = new Graphics();
-  const t = new Text({ text: "Option", style: btnStyle });
+  const t = new Text({ text: "Option", style: btnText });
   const hit = new Graphics();
   const c = new Container();
   c.addChild(bg, t, hit);
 
-  let w = 300, h = 56, enabled = true;
+  let w = 300, h = 56, enabled = true, fill = 0xffffff, stroke = 0xd9dde5;
 
-  const draw = (fill = 0xffffff, stroke = 0xd9dde5) => {
+  const draw = () => {
     bg.clear();
     bg.roundRect(0, 0, w, h, 12).fill(fill).stroke({ width: 1, color: stroke });
     t.x = 14; t.y = (h - t.height) / 2;
@@ -216,13 +253,10 @@ function makeButton(onClick) {
   c.on("pointerover", () => { if (!enabled) return; bg.tint = 0xf2f4f8; });
   c.on("pointerout",  () => { bg.tint = 0xffffff; });
 
-  c.resize = (nw, nh) => { w = nw; h = nh; draw(); };
-  c.setLabel = (s) => { t.text = s; draw(); };
-  c.setEnabled = (e) => { enabled = e; c.alpha = e ? 1.0 : 0.5; c.eventMode = e ? "static" : "none"; };
-  c.flash = (hex) => {
-    draw(parseInt(hex.replace("#",""), 16));
-    setTimeout(() => draw(), 150);
-  };
+  c.resize   = (nw, nh) => { w = nw; h = nh; draw(); };
+  c.setLabel = (s)      => { t.text = s; draw(); };
+  c.setEnabled = (e)    => { enabled = e; c.alpha = e ? 1.0 : 0.5; c.eventMode = e ? "static" : "none"; };
+  c.setFill    = (hex)  => { fill = hex; draw(); };
 
   draw();
   return c;
