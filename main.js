@@ -1,5 +1,13 @@
 // main.js
-import { Application, Text, TextStyle, Container, Graphics } from "pixi.js";
+import { Application, Text, TextStyle, Container, Graphics } from 'pixi.js';
+
+(async () => {
+  // boot marker (helps debugging)
+  console.log('pixi-quiz boot');
+
+  const app = new Application();
+  await app.init({ background: '#0f141a', resizeTo: window, antialias: true });
+  document.body.appendChild(app.canvas);
 
 /* --- Einfache Java-Fragen (Deutsch) --- */
 const questions = [
@@ -15,9 +23,9 @@ const questions = [
 
 let idx = 0, score = 0, finished = false;
 
-const app = new Application();
-await app.init({ background: "#0f141a", resizeTo: window, antialias: true });
-document.body.appendChild(app.canvas);
+// const app = new Application();
+// await app.init({ background: "#0f141a", resizeTo: window, antialias: true });
+// document.body.appendChild(app.canvas);
 
 /* --- Styles --- */
 const titleStyle  = new TextStyle({ fill: "#fff",    fontFamily: "ui-sans-serif, system-ui", fontSize: 28, fontWeight: "700" });
@@ -261,3 +269,4 @@ function makeButton(onClick) {
   draw();
   return c;
 }
+})();
