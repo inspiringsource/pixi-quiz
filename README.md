@@ -12,12 +12,24 @@ aus dem Modul **Einstieg in die Informatik (EIDI)** zu testen.
 - Schnelles Erproben neuer Funktionen (Timer, Frage-/Antwort-Logik, Animationen usw.)
 - Frühzeitiges Sammeln von Feedback und Themen.
 
+## Feedback
+
+Während des Testens des **Teitelbaum Prototyps** erhielten wir den Hinweis, dass die App nach der Auswahl einer Antwort **besseres Feedback** geben sollte.  
+
+Konkret wurde vorgeschlagen:
+
+- Nach der Auswahl soll der Nutzer sofort sehen, **ob die Antwort richtig oder falsch war**.
+- Zusätzlich soll eine **Erklärung** angezeigt werden, *warum* die gewählte Antwort richtig oder falsch ist.  
+
+Diese Rückmeldung hat uns gezeigt, dass wir mehr Fokus auf **Lern-Feedback** legen müssen, um den pädagogischen Wert der App zu erhöhen.  
+Wir haben daher geplant, ein **Feedback-Panel** einzubauen, das nach jeder Antwort eingeblendet wird und die Begründung liefert.
+
 ## Team
 
 **Gruppe:** Teitelbaum  
 
 Mitglieder:
-  
+
 - Rémy Emery  
 - Abraham Bobrovsky  
 - Gjorgi Dimitriev  
