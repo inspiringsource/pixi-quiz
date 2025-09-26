@@ -10,7 +10,7 @@ import { Application, Text, TextStyle, Container, Graphics } from 'pixi.js';
   document.body.appendChild(app.canvas);
 
 /* --- Einfache Java-Fragen (Deutsch) --- */
-const questions = [
+const QUESTION_BANK = [
   { q: "Wofür steht JVM?", opts: ["Java Virtual Machine","Java Version Manager","Java Vendor Module","Just Virtual Mode"], ans: 0 },
   { q: "Welches Schlüsselwort zeigt Vererbung an?", opts: ["with","extends","inherits","include"], ans: 1 },
   { q: "Welcher Datentyp speichert ganze Zahlen?", opts: ["float","int","boolean","char"], ans: 1 },
@@ -20,6 +20,33 @@ const questions = [
   { q: "Welches Schlüsselwort verbietet Überschreiben einer Methode?", opts: ["abstract","final","static","default"], ans: 1 },
   { q: "Welche Schnittstelle wird typischerweise zum Sortieren benutzt?", opts: ["Cloneable","Serializable","Comparable","Runnable"], ans: 2 }
 ];
+
+// Fisher–Yates shuffle (in-place)
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    const tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
+}
+
+// Build a randomized quiz (random question order and randomized answers per question)
+function buildQuiz(bank) {
+  // copy and shuffle question order
+  const order = bank.map(q => ({ q: q.q, opts: q.opts.slice(), ans: q.ans }));
+  shuffleInPlace(order);
+  // for each question, shuffle answers and recompute answer index
+  return order.map(q => {
+    const indices = q.opts.map((_, i) => i);
+    shuffleInPlace(indices);
+    const shuffledOpts = indices.map(i => q.opts[i]);
+    const newAns = indices.indexOf(q.ans);
+    return { q: q.q, opts: shuffledOpts, ans: newAns };
+  });
+}
+
+// This will hold the active randomized quiz
+let questions = buildQuiz(QUESTION_BANK);
 
 let idx = 0, score = 0, finished = false;
 
@@ -65,20 +92,99 @@ restartBtn.setLabel("Restart");
 
 overlay.addChild(resultCard, resultTitle, resultStats, restartBtn);
 
+// Pie chart for results
+const pieChart = new Graphics();
+overlay.addChild(pieChart);
+
+// Legend container (labels + color boxes)
+const legend = new Container();
+overlay.addChild(legend);
+
+function renderPie(correct, wrong) {
+  const total = Math.max(1, correct + wrong);
+  const start = -Math.PI / 2; // start at 12 o'clock
+  const angleRight = (correct / total) * Math.PI * 2;
+  const angleWrong = (wrong   / total) * Math.PI * 2;
+
+  // Center the pie inside the result card and push it well below the stats
+  const pad = 16;
+  const cx = resultCard.x + cardW / 2;
+  const cy = resultStats.y + resultStats.height + 100; // extra padding below stats
+
+  // Radius that safely fits within the card
+  const radius = Math.min(90, Math.max(60, Math.min(cardW * 0.35, (cardW - pad * 2) / 2 - 10)));
+
+  // Clear previous drawings
+  pieChart.clear();
+  legend.removeChildren();
+
+  // Green slice (Richtig)
+  if (angleRight > 0) {
+    pieChart.moveTo(cx, cy)
+      .arc(cx, cy, radius, start, start + angleRight)
+      .lineTo(cx, cy)
+      .fill(0x22c55e);
+  }
+
+  // Red slice (Falsch)
+  if (angleWrong > 0) {
+    pieChart.moveTo(cx, cy)
+      .arc(cx, cy, radius, start + angleRight, start + angleRight + angleWrong)
+      .lineTo(cx, cy)
+      .fill(0xef4444);
+  }
+
+  // Outline
+  pieChart.circle(cx, cy, radius).stroke({ width: 1, color: 0xd9dde5 });
+
+  // --- Legend below the chart ---
+  const legendY = cy + radius + 18;
+  const gap = 90; // horizontal space between the two entries
+  const boxSize = 12;
+
+  // Richtig (green)
+  const rightBox = new Graphics();
+  rightBox.rect(0, 0, boxSize, boxSize).fill(0x22c55e);
+  const rightLabel = new Text({ text: " Richtig", style: new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 14 }) });
+  const right = new Container();
+  right.addChild(rightBox, rightLabel);
+  rightLabel.x = boxSize + 6;
+  rightLabel.y = -2;
+
+  // Falsch (red)
+  const wrongBox = new Graphics();
+  wrongBox.rect(0, 0, boxSize, boxSize).fill(0xef4444);
+  const wrongLabel = new Text({ text: " Falsch", style: new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 14 }) });
+  const wrongC = new Container();
+  wrongC.addChild(wrongBox, wrongLabel);
+  wrongLabel.x = boxSize + 6;
+  wrongLabel.y = -2;
+
+  // Position legend centered under the pie
+  right.x = cx - gap / 2 - (boxSize + 6 + rightLabel.width) / 2;
+  wrongC.x = cx + gap / 2 - (boxSize + 6 + wrongLabel.width) / 2;
+  right.y = wrongC.y = legendY;
+
+  legend.addChild(right, wrongC);
+}
+
 /* --- Layout --- */
+let cardW = 0, cardH = 0; // used by renderPie
+
 const layout = () => {
   const pad = 16;
   const w = app.renderer.width;
   const h = app.renderer.height;
-  const maxW = Math.min(720, w - pad * 2);
+  cardW = Math.min(520, w - 2 * pad);
+  cardH = 400; // more space for stats + pie + legend
 
   // Main view
   title.x = pad; title.y = pad;
 
-  questionText.style.wordWrapWidth = maxW;
+  questionText.style.wordWrapWidth = cardW;
   questionText.x = pad; questionText.y = title.y + title.height + 10;
 
-  const btnW = maxW, btnH = 56, gap = 10;
+  const btnW = cardW, btnH = 56, gap = 10;
   for (let i = 0; i < buttons.length; i++) {
     const b = buttons[i];
     b.position.set(pad, questionText.y + questionText.height + 16 + i * (btnH + gap));
@@ -86,11 +192,9 @@ const layout = () => {
   }
   const lastBtn = buttons[buttons.length - 1];
   scoreText.x = pad; scoreText.y = lastBtn.y + btnH + 14;
-  progressText.y = scoreText.y; progressText.x = pad + maxW - progressText.width;
+  progressText.y = scoreText.y; progressText.x = pad + cardW - progressText.width;
 
   // Results overlay (center)
-  const cardW = Math.min(520, w - 2 * pad);
-  const cardH = 220;
   resultCard.clear();
   resultCard.roundRect(0, 0, cardW, cardH, 16).fill(0xffffff).stroke({ width:1, color:0xd9dde5 });
   resultCard.x = (w - cardW) / 2;
@@ -117,9 +221,10 @@ function setUI() {
     // Results
     const total = questions.length;
     const wrong = total - score;
-    resultStats.text = `Richtig: ${score}   |   Falsch: ${wrong}   |   Gesamt: ${total}`;
+    resultStats.text = `Richtig: ${score}   |   Falsch: ${wrong}   |   Gesamt: ${total}` + "\n\n";
     overlay.visible = true;
     layout();
+    renderPie(score, wrong);
     return;
   }
   const q = questions[idx];
@@ -159,8 +264,11 @@ function onPick(i, btnRef) {
 
 function restart() {
   idx = 0; score = 0; finished = false;
+  questions = buildQuiz(QUESTION_BANK); // new random order & shuffled answers
   buttons.forEach(b => b.setEnabled(true));
   overlay.visible = false;
+  pieChart.clear();
+  legend.removeChildren();
   setUI();
 }
 

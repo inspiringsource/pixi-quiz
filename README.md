@@ -39,3 +39,11 @@ Mitglieder:
 - Dies ist **kein finales Produkt**, sondern ein technisches Experiment.  
 - Die offizielle Abgabe erfolgt weiterhin als Thunkable-Projekt gemäss Kursvorgaben.  
 - Der Code ist **Work-in-Progress** und kann sich häufig ändern.
+
+## Installation
+
+```bash
+nvm use 22
+npm install
+npm run dev
+```
