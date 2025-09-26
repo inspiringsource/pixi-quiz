@@ -3,7 +3,7 @@ import { Application, Text, TextStyle, Container, Graphics } from 'pixi.js';
 
 (async () => {
   // boot marker (helps debugging)
-  console.log('pixi-quiz boot');
+  console.log('Teitelbaum-quiz boot');
 
   const app = new Application();
   await app.init({ background: '#0f141a', resizeTo: window, antialias: true });
@@ -42,7 +42,7 @@ const overlay = new Container();   app.stage.addChild(overlay);  // results scre
 overlay.visible = false;
 
 /* --- Title / Question / Status --- */
-const title = new Text({ text: "Java Quiz", style: titleStyle }); root.addChild(title);
+const title = new Text({ text: "Teitelbaum Java Quiz", style: titleStyle }); root.addChild(title);
 const questionText = new Text({ text: "", style: qStyle });       root.addChild(questionText);
 const scoreText = new Text({ text: "Punkte: 0", style: smallStyle });
 const progressText = new Text({ text: "Frage 1 / 8", style: smallStyle });
