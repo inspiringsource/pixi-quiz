@@ -47,3 +47,7 @@ nvm use 22
 npm install
 npm run dev
 ```
+
+## Audio Credits
+
+Sound effect by [freesound_community](https://pixabay.com/users/freesound_community-46691455/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=91679) from [Pixabay](https://pixabay.com/sound-effects//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=91679)

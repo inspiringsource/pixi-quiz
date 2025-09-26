@@ -9,6 +9,12 @@ import { Application, Text, TextStyle, Container, Graphics } from 'pixi.js';
   await app.init({ background: '#0f141a', resizeTo: window, antialias: true });
   document.body.appendChild(app.canvas);
 
+// --- Sound effects ---
+const sfxRight = new Audio('./yay-soundeffect.mp3');
+const sfxWrong = new Audio('./oh-soundeffect.mp3');
+[sfxRight, sfxWrong].forEach(a => { a.preload = 'auto'; a.volume = 0.7; });
+function playSfx(a) { try { a.currentTime = 0; a.play(); } catch (_) { /* ignore autoplay errors */ } }
+
 /* --- Einfache Java-Fragen (Deutsch) --- */
 const QUESTION_BANK = [
   { q: "Wofür steht JVM?", opts: ["Java Virtual Machine","Java Version Manager","Java Vendor Module","Just Virtual Mode"], ans: 0 },
@@ -106,63 +112,60 @@ function renderPie(correct, wrong) {
   const angleRight = (correct / total) * Math.PI * 2;
   const angleWrong = (wrong   / total) * Math.PI * 2;
 
-  // Center the pie inside the result card and push it well below the stats
   const pad = 16;
-  const cx = resultCard.x + cardW / 2;
-  const cy = resultStats.y + resultStats.height + 100; // extra padding below stats
+  const cx = Math.round(resultCard.x + cardW / 2);
+
+  // Responsive gap under stats
+  const gapBelowStats = Math.max(40, Math.round(app.renderer.height * 0.05));
+  let cy = Math.round(resultStats.y + resultStats.height + gapBelowStats);
 
   // Radius that safely fits within the card
-  const radius = Math.min(90, Math.max(60, Math.min(cardW * 0.35, (cardW - pad * 2) / 2 - 10)));
+  const maxRByWidth  = Math.floor(Math.min(90, Math.max(60, Math.min(cardW * 0.35, (cardW - pad * 2) / 2 - 10))));
+  const maxRByHeight = Math.floor((resultCard.y + cardH - 16 - 48 /*restart btn*/ - 16 - cy - 18 /*legend gap*/ - 16 /*legend size budget*/) / 2);
+  const radius = Math.max(40, Math.min(maxRByWidth, maxRByHeight));
 
-  // Clear previous drawings
+  // If height is still too tight, push the pie down a bit
+  const minTop = resultStats.y + resultStats.height + 40;
+  if (cy - radius < minTop) cy = minTop + radius;
+
   pieChart.clear();
   legend.removeChildren();
 
-  // Green slice (Richtig)
   if (angleRight > 0) {
     pieChart.moveTo(cx, cy)
       .arc(cx, cy, radius, start, start + angleRight)
       .lineTo(cx, cy)
       .fill(0x22c55e);
   }
-
-  // Red slice (Falsch)
   if (angleWrong > 0) {
     pieChart.moveTo(cx, cy)
       .arc(cx, cy, radius, start + angleRight, start + angleRight + angleWrong)
       .lineTo(cx, cy)
       .fill(0xef4444);
   }
-
-  // Outline
   pieChart.circle(cx, cy, radius).stroke({ width: 1, color: 0xd9dde5 });
 
-  // --- Legend below the chart ---
-  const legendY = cy + radius + 18;
-  const gap = 90; // horizontal space between the two entries
+  // Legend below the chart
+  const legendY = Math.round(cy + radius + 18);
+  const gap = Math.max(70, Math.min(120, Math.round(cardW * 0.18)));
   const boxSize = 12;
 
-  // Richtig (green)
   const rightBox = new Graphics();
   rightBox.rect(0, 0, boxSize, boxSize).fill(0x22c55e);
   const rightLabel = new Text({ text: " Richtig", style: new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 14 }) });
   const right = new Container();
   right.addChild(rightBox, rightLabel);
-  rightLabel.x = boxSize + 6;
-  rightLabel.y = -2;
+  rightLabel.x = boxSize + 6; rightLabel.y = -2;
 
-  // Falsch (red)
   const wrongBox = new Graphics();
   wrongBox.rect(0, 0, boxSize, boxSize).fill(0xef4444);
   const wrongLabel = new Text({ text: " Falsch", style: new TextStyle({ fill: "#0f141a", fontFamily: "ui-sans-serif, system-ui", fontSize: 14 }) });
   const wrongC = new Container();
   wrongC.addChild(wrongBox, wrongLabel);
-  wrongLabel.x = boxSize + 6;
-  wrongLabel.y = -2;
+  wrongLabel.x = boxSize + 6; wrongLabel.y = -2;
 
-  // Position legend centered under the pie
-  right.x = cx - gap / 2 - (boxSize + 6 + rightLabel.width) / 2;
-  wrongC.x = cx + gap / 2 - (boxSize + 6 + wrongLabel.width) / 2;
+  right.x = Math.round(cx - gap / 2 - (boxSize + 6 + rightLabel.width) / 2);
+  wrongC.x = Math.round(cx + gap / 2 - (boxSize + 6 + wrongLabel.width) / 2);
   right.y = wrongC.y = legendY;
 
   legend.addChild(right, wrongC);
@@ -175,39 +178,55 @@ const layout = () => {
   const pad = 16;
   const w = app.renderer.width;
   const h = app.renderer.height;
-  cardW = Math.min(520, w - 2 * pad);
-  cardH = 400; // more space for stats + pie + legend
 
-  // Main view
+  // Content width and responsive heights
+  cardW = Math.min(520, w - 2 * pad);
+  const safeTop = 40; // leave space for notches / status bar
+
+  // Title
   title.x = pad; title.y = pad;
 
+  // Question width and button metrics
   questionText.style.wordWrapWidth = cardW;
-  questionText.x = pad; questionText.y = title.y + title.height + 10;
+  questionText.x = pad; questionText.y = Math.round(title.y + title.height + 10);
 
-  const btnW = cardW, btnH = 56, gap = 10;
+  const btnW = cardW;
+  const btnH = Math.max(52, Math.round(h * 0.065));
+  const gap = Math.max(8, Math.round(h * 0.012));
+
   for (let i = 0; i < buttons.length; i++) {
     const b = buttons[i];
-    b.position.set(pad, questionText.y + questionText.height + 16 + i * (btnH + gap));
+    b.position.set(pad, Math.round(questionText.y + questionText.height + 16 + i * (btnH + gap)));
     b.resize(btnW, btnH);
   }
   const lastBtn = buttons[buttons.length - 1];
-  scoreText.x = pad; scoreText.y = lastBtn.y + btnH + 14;
-  progressText.y = scoreText.y; progressText.x = pad + cardW - progressText.width;
+  scoreText.x = pad; scoreText.y = Math.round(lastBtn.y + btnH + 14);
+  progressText.y = scoreText.y; progressText.x = Math.round(pad + cardW - progressText.width);
 
-  // Results overlay (center)
+  // --- Results overlay (center) ---
+  // Compute a dynamic card height based on content we plan to show
+  const titleH = resultTitle.height;
+  const statsH = resultStats.height;
+  const gapBelowStats = Math.max(40, Math.round(h * 0.05));
+  const estRadius = Math.floor(Math.min(90, Math.max(60, Math.min(cardW * 0.35, (cardW - 32) / 2 - 10))));
+  const legendH = 20; // approx
+  const restartH = 48;
+  const desired = 16 + titleH + 8 + statsH + gapBelowStats + estRadius * 2 + 18 + legendH + 16 + restartH + 16;
+  cardH = Math.max(360, Math.min(h - safeTop * 2, Math.round(desired)));
+
   resultCard.clear();
   resultCard.roundRect(0, 0, cardW, cardH, 16).fill(0xffffff).stroke({ width:1, color:0xd9dde5 });
-  resultCard.x = (w - cardW) / 2;
-  resultCard.y = Math.max((h - cardH) / 2, 40);
+  resultCard.x = Math.round((w - cardW) / 2);
+  resultCard.y = Math.max(Math.round((h - cardH) / 2), safeTop);
 
   resultTitle.x = resultCard.x + 16;
   resultTitle.y = resultCard.y + 14;
 
   resultStats.x = resultCard.x + 16;
-  resultStats.y = resultTitle.y + resultTitle.height + 8;
+  resultStats.y = Math.round(resultTitle.y + resultTitle.height + 8);
 
-  restartBtn.position.set(resultCard.x + 16, resultCard.y + cardH - 16 - 48);
-  restartBtn.resize(cardW - 32, 48);
+  restartBtn.position.set(resultCard.x + 16, Math.round(resultCard.y + cardH - 16 - restartH));
+  restartBtn.resize(cardW - 32, restartH);
 };
 window.addEventListener("resize", layout);
 
@@ -245,12 +264,14 @@ function onPick(i, btnRef) {
   const correct = questions[idx].ans === i;
 
   if (correct) {
+    playSfx(sfxRight);
     score++;
     // button = green + confetti
     btnRef.setFill(0x22c55e);
     const b = btnRef.getBounds();
     confettiBurst(b.x + b.width / 2, b.y + b.height / 2);
   } else {
+    playSfx(sfxWrong);
     // button = red + shake + score flash red
     btnRef.setFill(0xef4444);
     shake(btnRef, 350);            // 350ms shake
