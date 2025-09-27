@@ -412,20 +412,18 @@ import { Application, Text, TextStyle, Container, Graphics } from "pixi.js";
     questionText.y = Math.round(title.y + title.height + 10);
 
     const btnW = cardW;
-    const btnH = Math.max(52, Math.round(h * 0.065));
+    const minBtnH = Math.max(52, Math.round(h * 0.065));
     const gap = Math.max(8, Math.round(h * 0.012));
 
+    let y = Math.round(questionText.y + questionText.height + 16);
     for (let i = 0; i < buttons.length; i++) {
       const b = buttons[i];
-      b.position.set(
-        pad,
-        Math.round(questionText.y + questionText.height + 16 + i * (btnH + gap))
-      );
-      b.resize(btnW, btnH);
+      b.autoSize(btnW, minBtnH); // ensures height fits its wrapped text
+      b.position.set(pad, y);
+      y += b.getHeight() + gap; // stack using real height
     }
-    const lastBtn = buttons[buttons.length - 1];
     scoreText.x = pad;
-    scoreText.y = Math.round(lastBtn.y + btnH + 14);
+    scoreText.y = y + 6;
     progressText.y = scoreText.y;
     progressText.x = Math.round(pad + cardW - progressText.width);
 
@@ -634,19 +632,34 @@ import { Application, Text, TextStyle, Container, Graphics } from "pixi.js";
     const c = new Container();
     c.addChild(bg, t, hit);
 
+    const PAD_X = 14,
+      PAD_Y = 12;
     let w = 300,
       h = 56,
       enabled = true,
       fill = 0xffffff,
       stroke = 0xd9dde5;
 
+    function applyTextWrap() {
+      t.style = new TextStyle({
+        ...btnText,
+        wordWrap: true,
+        wordWrapWidth: Math.max(60, w - PAD_X * 2),
+      });
+    }
+
     const draw = () => {
+      applyTextWrap();
+      const neededH = Math.ceil(t.height) + PAD_Y * 2;
+      if (h < neededH) h = neededH;
+
       bg.clear();
       bg.roundRect(0, 0, w, h, 12)
         .fill(fill)
         .stroke({ width: 1, color: stroke });
-      t.x = 14;
-      t.y = (h - t.height) / 2;
+      t.x = PAD_X;
+      t.y = Math.round((h - t.height) / 2);
+
       hit.clear();
       hit.rect(0, 0, w, h).fill(0xffffff, 0.0001);
     };
@@ -657,25 +670,35 @@ import { Application, Text, TextStyle, Container, Graphics } from "pixi.js";
       if (enabled) onClick(c);
     });
     c.on("pointerover", () => {
-      if (!enabled) return;
-      bg.tint = 0xf2f4f8;
+      if (enabled) bg.tint = 0xf2f4f8;
     });
     c.on("pointerout", () => {
       bg.tint = 0xffffff;
     });
 
+    // NEW: auto-size and report height
+    c.autoSize = (nw, minH = 56) => {
+      w = nw;
+      h = Math.max(minH, h);
+      applyTextWrap();
+      const neededH = Math.ceil(t.height) + PAD_Y * 2;
+      h = Math.max(minH, neededH);
+      draw();
+    };
     c.resize = (nw, nh) => {
       w = nw;
       h = nh;
       draw();
     };
+    c.getHeight = () => h;
+
     c.setLabel = (s) => {
       t.text = s;
       draw();
     };
     c.setEnabled = (e) => {
       enabled = e;
-      c.alpha = e ? 1.0 : 0.5;
+      c.alpha = e ? 1 : 0.5;
       c.eventMode = e ? "static" : "none";
     };
     c.setFill = (hex) => {
