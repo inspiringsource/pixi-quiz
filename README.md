@@ -30,9 +30,9 @@ Wir haben daher geplant, ein **Feedback-Panel** einzubauen, das nach jeder Antwo
 
 Mitglieder:
 
-- Rémy Emery  
-- Abraham Bobrovsky  
-- Gjorgi Dimitriev  
+- R Emery  
+- A Bobrovsky  
+- G Dimitriev  
 
 ## Hinweis
 
